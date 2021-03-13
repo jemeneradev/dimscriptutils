@@ -1,0 +1,126 @@
+package evaluator
+
+import (
+	"testing"
+
+	"github.com/jemeneradev/dimscript_utils/constants"
+	expression_handling "github.com/jemeneradev/dimscript_utils/expression_handling"
+	"github.com/jemeneradev/dimscript_utils/measurement_factors"
+)
+
+func TestEvaluateSimpleDimExpressionADD(t *testing.T) {
+	dm1 := measurement_factors.NewDimMeasurement("15", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER)
+	dm2 := measurement_factors.NewDimMeasurement("2", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER)
+	dmList := measurement_factors.NewMeasurementList()
+	measurement_factors.SaveMeasurementInList(dmList, dm1)
+	measurement_factors.SaveMeasurementInList(dmList, dm2)
+
+	dv1 := measurement_factors.NewDimVector(dmList, nil, nil, nil)
+
+	dm3 := measurement_factors.NewDimMeasurement("20", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER)
+	dm4 := measurement_factors.NewDimMeasurement("2", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER)
+	dmList2 := measurement_factors.NewMeasurementList()
+	measurement_factors.SaveMeasurementInList(dmList2, dm3)
+	measurement_factors.SaveMeasurementInList(dmList2, dm4)
+
+	dv2 := measurement_factors.NewDimVector(dmList2, nil, nil, nil)
+
+	dm5 := measurement_factors.NewDimMeasurement("660", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER)
+	dm6 := measurement_factors.NewDimMeasurement("2", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER)
+	dmList3 := measurement_factors.NewMeasurementList()
+	measurement_factors.SaveMeasurementInList(dmList3, dm5)
+	measurement_factors.SaveMeasurementInList(dmList3, dm6)
+
+	dv3 := measurement_factors.NewDimVector(dmList3, nil, nil, nil)
+
+	expStack := expression_handling.NewExpressionStack()
+	expression_handling.PushOperand(expStack, constants.DIM_VECTOR_OPRND, dv1)
+	expression_handling.PushOperand(expStack, constants.DIM_VECTOR_OPRND, dv2)
+	expression_handling.PushBiOperator(expStack, constants.ADD_OPERATOR)
+	expression_handling.PushOperand(expStack, constants.DIM_VECTOR_OPRND, dv3)
+	expression_handling.PushBiOperator(expStack, constants.ADD_OPERATOR)
+
+	handlers := NewDimensionHandlers()
+	context := NewDimContext(handlers)
+
+	//15,2 + 20,2 + 660,2 = 30 + 40 + 1320 = 1390
+	resultsOfExpression := Evaluate(expStack.Front().Value, context)
+	want := float64(1390)
+	if got := resultsOfExpression["Area"]; got != want {
+		t.Errorf("EncodedStack: results %v, got %v, want %v", resultsOfExpression, got, want)
+	}
+}
+
+func TestEvaluateSimpleDimExpressionSUB(t *testing.T) {
+	dmList := measurement_factors.NewMeasurementList()
+	measurement_factors.SaveMeasurementInList(dmList, measurement_factors.NewDimMeasurement("150", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+	measurement_factors.SaveMeasurementInList(dmList, measurement_factors.NewDimMeasurement("2", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+
+	dv1 := measurement_factors.NewDimVector(dmList, nil, nil, nil) //150",2" => 300
+
+	dmList2 := measurement_factors.NewMeasurementList()
+	measurement_factors.SaveMeasurementInList(dmList2, measurement_factors.NewDimMeasurement("30", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+	measurement_factors.SaveMeasurementInList(dmList2, measurement_factors.NewDimMeasurement("2", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+
+	dv2 := measurement_factors.NewDimVector(dmList2, nil, nil, nil) // 30",2" => 60
+
+	dmList3 := measurement_factors.NewMeasurementList()
+	measurement_factors.SaveMeasurementInList(dmList3, measurement_factors.NewDimMeasurement("45", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+	measurement_factors.SaveMeasurementInList(dmList3, measurement_factors.NewDimMeasurement("2", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+
+	dv3 := measurement_factors.NewDimVector(dmList3, nil, nil, nil) // 45",2" => 90
+
+	expStack := expression_handling.NewExpressionStack()
+	expression_handling.PushOperand(expStack, constants.DIM_VECTOR_OPRND, dv1)
+	expression_handling.PushOperand(expStack, constants.DIM_VECTOR_OPRND, dv2)
+	expression_handling.PushBiOperator(expStack, constants.SUB_OPERATOR) // 300 - 60
+	expression_handling.PushOperand(expStack, constants.DIM_VECTOR_OPRND, dv3)
+	expression_handling.PushBiOperator(expStack, constants.SUB_OPERATOR) // 300 - 60 - 90
+
+	handlers := NewDimensionHandlers()
+	context := NewDimContext(handlers)
+
+	//300 - 60 - 90 = 1390
+	resultsOfExpression := Evaluate(expStack.Front().Value, context)
+	want := float64(150)
+	if got := resultsOfExpression["Area"]; got != want {
+		t.Errorf("EncodedStack: results %v, got %v, want %v", resultsOfExpression, got, want)
+	}
+}
+
+func TestEvaluateSimpleDimExpressionUsingMultipliers(t *testing.T) {
+	dmList := measurement_factors.NewMeasurementList()
+	measurement_factors.SaveMeasurementInList(dmList, measurement_factors.NewDimMeasurement("150", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+	measurement_factors.SaveMeasurementInList(dmList, measurement_factors.NewDimMeasurement("2", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+
+	dv1 := measurement_factors.NewDimVector(dmList, nil, measurement_factors.NewDimMeasurement("3", constants.DIM_NONMEASUREMENT, constants.DIM_WHOLE_NUMBER), nil) //150",2"@dim!3 => 900
+
+	dmList2 := measurement_factors.NewMeasurementList()
+	measurement_factors.SaveMeasurementInList(dmList2, measurement_factors.NewDimMeasurement("30", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+	measurement_factors.SaveMeasurementInList(dmList2, measurement_factors.NewDimMeasurement("2", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+
+	dv2 := measurement_factors.NewDimVector(dmList2, nil, measurement_factors.NewDimMeasurement("3", constants.DIM_NONMEASUREMENT, constants.DIM_WHOLE_NUMBER), nil) // 30",2"@dim!3 => 180
+
+	dmList3 := measurement_factors.NewMeasurementList()
+	measurement_factors.SaveMeasurementInList(dmList3, measurement_factors.NewDimMeasurement("45", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+	measurement_factors.SaveMeasurementInList(dmList3, measurement_factors.NewDimMeasurement("2", constants.DIM_INCH, constants.DIM_WHOLE_NUMBER))
+
+	dv3 := measurement_factors.NewDimVector(dmList3, nil, measurement_factors.NewDimMeasurement("4", constants.DIM_NONMEASUREMENT, constants.DIM_WHOLE_NUMBER), nil) // 45",2"@dim!4 => 360
+
+	expStack := expression_handling.NewExpressionStack()
+	expression_handling.PushOperand(expStack, constants.DIM_VECTOR_OPRND, dv1)
+	expression_handling.PushOperand(expStack, constants.DIM_VECTOR_OPRND, dv2)
+	expression_handling.PushBiOperator(expStack, constants.ADD_OPERATOR) // 900 + 180
+	expression_handling.PushOperand(expStack, constants.DIM_VECTOR_OPRND, dv3)
+	expression_handling.PushBiOperator(expStack, constants.ADD_OPERATOR) // 900 + 180 + 360
+
+	handlers := NewDimensionHandlers()
+	context := NewDimContext(handlers)
+
+	//900 + 180 + 360 = 1440
+	resultsOfExpression := Evaluate(expStack.Front().Value, context)
+	want := float64(1440)
+	if got := resultsOfExpression["Area"]; got != want {
+		t.Errorf("EncodedStack: results %v, got %v, want %v", resultsOfExpression, got, want)
+	}
+}
