@@ -15,13 +15,15 @@ type evaluatorFunction (func(interface{}, interface{}) map[string]float64)
 DimContext context object holding global vars
 */
 type DimContext struct {
-	Count         float64 //holds project count
-	MutateCount   bool    //should count be changed in current calculation
-	Handlers      *map[string]interface{}
-	Table         map[string]interface{} //holds results for each section defined
-	Store         map[string]interface{} //holds section vars
-	Accumulator   []map[string]float64   //
-	accStackTop   int                    //where to store next. accStackTop - 1: working base
+	Count       float64 //holds project count
+	MutateCount bool    //should count be changed in current calculation
+	Handlers    *map[string]interface{}
+	Table       map[string]interface{} //holds results for each section defined
+	Store       map[string]interface{} //holds section vars
+
+	Accumulator []map[string]float64 //Holds scope object, use to save values
+	accStackTop int                  //where to store next. accStackTop - 1: working base
+
 	outPutOptions *ResultOutputOptions
 	eval          evaluatorFunction
 
@@ -221,6 +223,13 @@ func (dc *DimContext) Accumulate(val interface{}) {
 					//fmt.Printf("k:%v,v:%v\n", k, v)
 				}
 			}
+		case map[string]float64:
+			{
+				for k, v := range fv {
+					dc.Accumulator[dc.accStackTop-1][k] += v
+					//fmt.Printf("k:%v,v:%v\n", k, v)
+				}
+			}
 		}
 		//fmt.Fprintf(os.Stderr, "\nacctop:%v acc:%v lookup:%v\n", dc.accStackTop, dc.Accumulator, dc.lookup)
 	}
@@ -231,7 +240,8 @@ StoreAccumulator pop accumulator and save it in table
 */
 func (dc *DimContext) StoreAccumulator(name string) {
 	if len(dc.Accumulator) >= 0 && dc.accStackTop > 0 {
-		dc.Table[name] = dc.Accumulator[dc.accStackTop-1]
+		//dc.Table[name] = dc.Accumulator[dc.accStackTop-1]
+		dc.InsertIntoTable(name, dc.Accumulator[dc.accStackTop-1])
 	}
 }
 
