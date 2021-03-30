@@ -3,7 +3,6 @@ package measurement_factors
 import (
 	list "container/list"
 	"fmt"
-	"os"
 )
 
 type DimFunction struct {
@@ -49,16 +48,33 @@ type valuegetterforfunc interface {
 }
 
 func (fc *DimFunction) DetermineResults(context interface{}) interface{} {
-	fmt.Fprintf(os.Stderr, "dealing with a function call %T %v,context:%v\n", fc, fc, context)
+	//fmt.Fprintf(os.Stderr, "dealing with a function call %T %v,context:%v\n", fc, fc, context)
+
+	/* for e := fc.Args.Front(); e != nil; e = e.Next() {
+		// do something with e.Value
+		fmt.Fprintf(os.Stderr, "arg: %v\n", e)
+	} */
+
 	sectionRunner, ok := context.(sectionEvaluator)
 	if ok {
 		results := sectionRunner.EvaluateSectionAt(fc.secName, fc.Name, fc.Args, context)
 		/* fmt.Fprintf(os.Stderr, "after dealing with func:\n")
 		fmt.Fprintf(os.Stderr, "\t\tfunc: %v\n", fc)
 		fmt.Fprintf(os.Stderr, "\t\tcontext: %v\n", context)
-		fmt.Fprintf(os.Stderr, "\t\tresults: %v\n", results)
-		*/
+		fmt.Fprintf(os.Stderr, "\t\tresults: %v\n", results) */
+
 		return results
 	}
 	return nil
+}
+
+func (fc *DimFunction) String() string {
+	var argslice []interface{}
+
+	for e := fc.Args.Front(); e != nil; e = e.Next() {
+		// do something with e.Value
+		argslice = append(argslice, e.Value)
+	}
+
+	return fmt.Sprintf("func:%v(%v) @%v ", fc.Name, argslice, fc.secName)
 }

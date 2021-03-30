@@ -8,8 +8,12 @@ type computable interface {
 	Compute(interface{})
 }
 
+type computableWithFunc interface {
+	Compute(interface{}, func(interface{}, interface{}) map[string]float64)
+}
+
 type biOperatorHandler interface {
-	HandleBiOperator(func(interface{}, interface{}), interface{}) interface{}
+	HandleBiOperator(left interface{}, right interface{}, context interface{}) interface{}
 }
 
 type hasResults interface {
@@ -21,16 +25,15 @@ type hasNumberRepresentation interface {
 }
 
 func processMember(item interface{}, context interface{}) {
-	////fmt.Fprintf(os.Stderr, "%T %T\n", item, context)
+	//fmt.Fprintf(os.Stderr, "%T %T\n", item, context)
 	switch v := item.(type) {
-	case biOperatorHandler:
-		////fmt.Fprintf(os.Stderr, "bi:%v\n", item)
-		v.HandleBiOperator(processMember, context)
-	case uniOperatorHandler:
-		////fmt.Printf("\nx is UniOperator %v\n", v)             // here v has type int
 	case computable:
-		//fmt.Fprintf(os.Stderr, "op:%v - %T %v\n", item, context, context)
 		v.Compute(context)
+	case computableWithFunc:
+		{
+			//fmt.Fprintf(os.Stderr, "func %v %v\n", item, context)
+			v.Compute(context, Evaluate)
+		}
 	}
 }
 
@@ -38,7 +41,7 @@ func processMember(item interface{}, context interface{}) {
 Evaluate passed in item gets calculated and return results. Requires a context object.
 */
 func Evaluate(item interface{}, passedContext interface{}) map[string]float64 {
-	//fmt.Fprintf(os.Stderr, "eval:: %T %T\n", item, passedContext)
+	//fmt.Fprintf(os.Stderr, "eval:: %v %T\n", item, item)
 
 	if item != nil {
 		switch passedContext.(type) {
@@ -56,5 +59,5 @@ func Evaluate(item interface{}, passedContext interface{}) map[string]float64 {
 			}
 		}
 	}
-	return make(map[string]float64)
+	return nil
 }

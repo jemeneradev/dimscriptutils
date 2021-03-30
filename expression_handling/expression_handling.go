@@ -10,6 +10,7 @@ func NewExpressionStack() *list.List {
 }
 
 func PushOperand(x interface{}, oprnType int, v interface{}) {
+	//fmt.Fprintf(os.Stderr, "%v ", v)
 	switch l := x.(type) {
 	case *list.List:
 		{
@@ -21,19 +22,29 @@ func PushOperand(x interface{}, oprnType int, v interface{}) {
 }
 
 func PushBiOperator(x interface{}, op int) {
+	//fmt.Fprintf(os.Stderr, "%v ", op)
 	switch l := x.(type) {
 	case *list.List:
 		{
 			if l != nil {
-				right := l.Remove(l.Front())
-				left := l.Remove(l.Front())
-				l.PushFront(NewDimBiOperator(op, left, right))
+				//right := l.Remove(l.Front())
+				//left := l.Remove(l.Front())
+				l.PushFront(NewDimBiOperator(op, nil, nil))
 			}
 		}
 	}
 }
 
 func Pop(x interface{}) interface{} {
+	switch l := x.(type) {
+	case *list.List:
+		{
+			return NewDimExpList(l)
+		}
+	}
+	return nil
+}
+func RetriveList(x interface{}) interface{} {
 	switch l := x.(type) {
 	case *list.List:
 		{

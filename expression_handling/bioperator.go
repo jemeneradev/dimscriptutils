@@ -2,6 +2,7 @@ package expression_handling
 
 import (
 	//"fmt"
+
 	"fmt"
 
 	"github.com/jemeneradev/dimscriptutils/constants"
@@ -120,22 +121,27 @@ func (biopr *DimBiOperator) BiOperatorResolved() interface{} {
 /*
 Compute applies type operation(currently only +-) on value nodes
 */
+
 func (biopr *DimBiOperator) Compute() interface{} {
 	var lresults map[string]float64
+
 	switch l := (biopr.LValue).(type) {
-	case hasResults:
+	case map[string]float64:
 		{
-			lresults = l.Results()
+			lresults = l
 		}
 	}
+
 	var rresults map[string]float64
+
 	switch r := (biopr.RValue).(type) {
-	case hasResults:
+	case map[string]float64:
 		{
-			rresults = r.Results()
+			rresults = r
 		}
 	}
-	//fmt.Printf("\nOperator Compute: left(%v) right(%v)\n",lresults,rresults)
+
+	//fmt.Printf("\nOperator Compute: left(%v) %v right(%v)\n", lresults, biopr.Type, rresults)
 	if lresults != nil && rresults != nil {
 		switch biopr.Type {
 		case constants.AddOperator:
@@ -164,16 +170,21 @@ func (biopr *DimBiOperator) Compute() interface{} {
 /*
 HandleBiOperator passes each value node through passed in handler function, with context
 */
-func (biopr *DimBiOperator) HandleBiOperator(fn func(interface{}, interface{}), context interface{}) interface{} {
-	fn(biopr.LValue, context)
-	fn(biopr.RValue, context)
-	return NewTempOperand(biopr.Compute())
+func (biopr *DimBiOperator) HandleBiOperator(left interface{}, right interface{}, context interface{}) interface{} {
+	//fmt.Fprintf(os.Stderr, "before biopr compute: L:%v R:%v\n", biopr.LValue, biopr.RValue)
+	biopr.LValue = left
+	biopr.RValue = right
+	results := NewTempOperand(biopr.Compute())
+	biopr.LValue = results
+	biopr.RValue = nil
+	return results
 }
 
 /*
 Results return computed results
 */
-func (biopr *DimBiOperator) Results() map[string]float64 {
+/* func (biopr *DimBiOperator) Results() map[string]float64 {
+	fmt.Fprintf(os.Stderr, "temp: %v %T\n", biopr.LValue, biopr.LValue)
 	switch v := biopr.LValue.(type) {
 	case hasResults:
 		{
@@ -181,7 +192,7 @@ func (biopr *DimBiOperator) Results() map[string]float64 {
 		}
 	}
 	return nil
-}
+} */
 
 /*
 Encode debug string, outputs formatted content

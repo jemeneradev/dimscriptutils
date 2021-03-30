@@ -3,8 +3,6 @@ package evaluator
 import (
 	"container/list"
 	"encoding/json"
-	"fmt"
-	"os"
 	"regexp"
 	"strings"
 )
@@ -29,6 +27,8 @@ type DimContext struct {
 
 	lookup []string
 
+	SaveMode bool //make it a bool stack instead
+
 	sectionIndex map[string]interface{}
 }
 
@@ -46,6 +46,7 @@ func NewDimContext(handlers *map[string]interface{}, passedInOptions ...interfac
 	n.Store = make(map[string]interface{})
 	n.sectionIndex = make(map[string]interface{})
 	n.lookup = make([]string, 0)
+	n.SaveMode = false
 	if passedInOptions != nil {
 		n.outPutOptions = NewResultOutputOptions(passedInOptions)
 	} else {
@@ -66,8 +67,17 @@ type hasDeterminResults interface {
 	DetermineResults(context interface{}) interface{}
 }
 
-func (dc *DimContext) EvaluateSectionAt(sectionName string, methodName string, args interface{}, cntx interface{}) interface{} {
+func (dc *DimContext) SetSaveMode(b bool) {
+	dc.SaveMode = b
+}
+func (dc *DimContext) GetSaveMode() bool {
+	return dc.SaveMode
+}
 
+func (dc *DimContext) EvaluateSectionAt(sectionName string, methodName string, args interface{}, cntx interface{}) interface{} {
+	defer dc.SetSaveMode(false)
+
+	dc.SetSaveMode(true)
 	section, ok := dc.sectionIndex[sectionName].(statementGetter)
 	if ok {
 		funcRef := section.GetStatementAt(methodName)
@@ -75,7 +85,8 @@ func (dc *DimContext) EvaluateSectionAt(sectionName string, methodName string, a
 			//!handle section not defined
 			return nil
 		}
-		//fmt.Fprintf(os.Stderr, "Evaluate: %v[%v]:%v %v\n", sectionName, methodName, args, cntx)
+		//fmt.Fprintf(os.Stderr, "funcref %v %T\n", funcRef, funcRef)
+		//fmt.Fprintf(os.Stderr, "Evaluate: %v[%v](args:%v) %v\n", sectionName, methodName, args, cntx)
 		switch ps := funcRef.(type) {
 		case parameterSetter:
 			{
@@ -99,8 +110,9 @@ func (dc *DimContext) EvaluateSectionAt(sectionName string, methodName string, a
 						//fmt.Fprintf(os.Stderr, "\n\t\tbefore func eval %v %T %T\n", funcRef, funcRef, cntx)
 						//fmt.Fprintf(os.Stderr, "content in Evaluate:%v %T\n", cntx, cntx)
 						//dc.PushLookUp(methodName)
+						//fmt.Fprintf(os.Stderr, "parameters used: %v\n", extractedParameters)
 						results := dc.eval(funcRef, cntx)
-						//fmt.Fprintf(os.Stderr, "func results : %v \n", results)
+						//fmt.Fprintf(os.Stderr, "func results : %v %p %v %v\n", results, &results, funcRef, cntx)
 						//dc.PopLookUp()
 						return results
 					}
@@ -111,7 +123,7 @@ func (dc *DimContext) EvaluateSectionAt(sectionName string, methodName string, a
 		/* for p := range args {
 			//fmt.Fprintf(os.Stderr, "parameter: %v\n", p)
 		} */
-		////fmt.Fprintf(os.Stderr, "Evaluate function:%v at section(%v)\n -- ref%v\n", f, methodName, funcOp)
+		//fmt.Fprintf(os.Stderr, "Evaluate function:%v at section(%v)\n -- ref%v\n", f, methodName, funcOp)
 		//dc.eval(funcOp, dc)
 	}
 	return nil
@@ -129,7 +141,7 @@ func (dc *DimContext) PopLookUp() {
 }
 
 func (dc *DimContext) LookUpVar(v string) interface{} {
-	fmt.Fprintf(os.Stderr, "looking for %v\n", v)
+	//fmt.Fprintf(os.Stderr, "looking for %v\n", v)
 	lookupLen := len(dc.lookup) - 1
 	var section string
 	for i := 0; i <= lookupLen; i++ {
@@ -197,6 +209,8 @@ AccumulatePop DimContext stack interface pop
 */
 func (dc *DimContext) AccumulatePop() interface{} {
 	tempAcc := dc.Accumulator[dc.accStackTop-1]
+	//fmt.Fprintf(os.Stderr, "\n\t\tbefore pop acc stack: %v %v %v\n", dc.Accumulator, dc.accStackTop, dc.lookup)
+	//fmt.Fprintf(os.Stderr, "\n\t\tbefore pop acctop: %v\n", tempAcc)
 	if dc.accStackTop > 0 {
 		dc.Accumulator[dc.accStackTop-1] = nil
 		dc.accStackTop--
@@ -340,20 +354,42 @@ func (dc *DimContext) GetHandler(k string) interface{} {
 	return (*dc.Handlers)[k]
 }
 
+func mapDiff(l map[string]float64, r map[string]float64) {
+	for kr, v := range r {
+		_, ok := l[kr]
+		if ok {
+			l[kr] -= v
+		} else {
+			l[kr] = -v
+		}
+	}
+}
+
 func (dc *DimContext) retriveSectionsToInclude() []string {
 	//dc.StoreAccumulator("main") //save current accumulator as main in table
-	////fmt.Printf("includeOption:%v\n", dc.outPutOptions.includeInResponce)
+	//fmt.Printf("includeOption:%v\n", dc.outPutOptions.includeInResponce)
 	includeCmdRegex := regexp.MustCompile(`^(?P<includeVerb>(only|except))(?P<rest>.+)`)
 	includeResults := includeCmdRegex.FindStringSubmatch(dc.outPutOptions.includeInResponce)
 	if len(includeResults) == 0 { //no include set was passed in or value incorrect format, fallback to default
 		////fmt.Printf("%v", dc.Table)
-		allSectionKeys := make([]string, 1)
-		for k := range dc.Table {
+		allSectionKeys := []string{"Main"}
+		/* for k := range dc.Table {
 			allSectionKeys = append(allSectionKeys, k)
-		}
-		////fmt.Printf("%v", allSectionKeys)
+		} */
+		//fmt.Printf("%v", allSectionKeys)
 		return allSectionKeys
 	} else {
+		mainTotal, ok := dc.Table["Main"].(map[string]float64)
+		if ok {
+			for k, v := range dc.Table {
+				//fmt.Printf("%v\n", k)
+				if k != "Main" {
+					mapDiff(mainTotal, v.(map[string]float64))
+					//fmt.Printf("sub %v\n", v)
+				}
+			}
+		}
+
 		switch includeResults[2] {
 		case "only":
 			{
@@ -402,13 +438,13 @@ func (dc *DimContext) retriveSectionsToInclude() []string {
 MarshalJSON testing string for DimContext
 */
 func (dc *DimContext) MarshalJSON() ([]byte, error) {
-	////fmt.Printf("\nStore:%v \nTable:%v\noptions:%v\n", dc.Store, dc.Table, dc.outPutOptions)
+	//fmt.Printf("\nStore:%v \nTable:%v\noptions:%v\n", dc.Store, dc.Table, dc.outPutOptions)
 	sectionTotals := make(map[string]float64)
 	sectionEntries := dc.retriveSectionsToInclude()
 
 	for _, section := range sectionEntries {
 		if section != "" {
-			////fmt.Fprintf(os.Stderr, "s: %v\n", dc.Table[section])
+			//fmt.Fprintf(os.Stderr, "s: <%v>\n", section) //dc.Table[section])
 			switch sM := dc.Table[section].(type) {
 			case map[string]float64:
 				for sK, sV := range sM {
@@ -418,7 +454,7 @@ func (dc *DimContext) MarshalJSON() ([]byte, error) {
 		}
 	}
 
-	////fmt.Fprintf(os.Stderr, "\n==%v==\n", dc.accStackTop)
+	//fmt.Fprintf(os.Stderr, "\n==%v== %v ==\n", sectionEntries, sectionTotals) //dc.accStackTop)
 	/* for mK, mEntry := range dc.Accumulator[dc.accStackTop-1] {
 		sectionTotals[mK] += mEntry
 	} */
@@ -432,7 +468,8 @@ func (dc *DimContext) MarshalJSON() ([]byte, error) {
 func (dc *DimContext) String() string {
 	/* fmt.Fprintf(os.Stderr, "\nmain table: %v\n", dc.Table)
 	fmt.Fprintf(os.Stderr, "main store: %v\n", dc.Store)
-	fmt.Fprintf(os.Stderr, "main lookup: %v\n", dc.lookup) */
+	fmt.Fprintf(os.Stderr, "main lookup: %v\n", dc.lookup)
+	fmt.Fprintf(os.Stderr, "main Acc: %v\n", dc.Accumulator) */
 	jr, _ := dc.MarshalJSON()
 	return string(jr)
 }

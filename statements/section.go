@@ -3,7 +3,6 @@ package statements
 import (
 	"container/list"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 )
@@ -92,7 +91,7 @@ func (sec *DimSectionDeclaration) GetStatementAt(mthd string) interface{} {
 	for e := sec.Statements.Back(); e != nil; e = e.Prev() {
 
 		if i == methodLoc {
-			fmt.Fprintf(os.Stderr, "\tstatement: %v %T %v\n", e.Value, e.Value, methodLoc)
+			//fmt.Fprintf(os.Stderr, "\tstatement: %v %T %v\n", e.Value, e.Value, methodLoc)
 			hasValue, ok := e.Value.(getValue)
 			if ok {
 				item = hasValue.GetValue()
@@ -120,7 +119,7 @@ func (sec *DimSectionDeclaration) SetParamsValues(pv interface{}) {
 			case map[string]string:
 				{
 					for pname, _ := range workingParams { //_ = ptype
-						//fmt.Fprintf(os.Stderr, "param[%v]:%v -> %v\n", pname, ptype, passedinValues[i])
+						//fmt.Fprintf(os.Stderr, "param[%v]:%v -> %v\n", pname, passedinValues[i])
 						sec.values[pname] = passedinValues[i]
 						i++
 					}
@@ -197,16 +196,15 @@ type storer interface {
 func (sec *DimSectionDeclaration) DetermineResults(context interface{}) interface{} {
 	//results := make(map[string]float64))
 
-	//fmt.Fprintf(os.Stderr, "solving %v\n\thasVars%v\n\tcontext:%v\n\tparams:%v\n", sec.Name, sec.hasVariableReferences, context, sec.params)
-	//fmt.Fprintf(os.Stderr, "\nDetermining results(%v):\n", sec.Name)
+	//fmt.Fprintf(os.Stderr, "solving %v\n\thasVars%v\n\tcontext:%v\n\tparams:%v\n\tvalues:%v\n", sec.Name, sec.hasVariableReferences, context, sec.params, sec.values)
 
 	if sec.executing == true || sec.params == nil { // nil sec.params marks a section division, helpful in dividing output results
 		workingContext := sec.determineContext(context)
-		//fmt.Fprintf(os.Stderr, "\tworking context: %v\n", workingContext)
-
-		if sec.acc == nil {
-			sec.acc = make(map[string]float64)
-		}
+		//fmt.Fprintf(os.Stderr, "\n=======Determining results(%v):\n", sec.Name)
+		//if sec.acc == nil {
+		sec.acc = make(map[string]float64)
+		//fmt.Fprintf(os.Stderr, "\tacc: %v, section:%v\n", sec.acc, sec)
+		//}
 
 		//push section into context
 		switch acc := workingContext.(type) {
@@ -245,7 +243,7 @@ func (sec *DimSectionDeclaration) DetermineResults(context interface{}) interfac
 					switch v := e.Value.(type) {
 					case computable:
 						{
-							//fmt.Fprintf(os.Stderr, "\nbefore every statement - statement: %v\n", e)
+							//fmt.Fprintf(os.Stderr, "\nbefore every statement - statement: %v %T\n", v, v)
 							//fmt.Fprintf(os.Stderr, "hasOwnContext: %v\n", hasOwnContext)
 							v.Compute(workingContext)
 							//fmt.Fprintf(os.Stderr, "\nafter every statement %v - context: %v\n", v, workingContext)
@@ -260,10 +258,10 @@ func (sec *DimSectionDeclaration) DetermineResults(context interface{}) interfac
 			}
 		}
 
-		//fmt.Fprintf(os.Stderr, "\nEnd of Section: %v Acc:%v context:%v\n\n", sec.Name, sec.acc, workingContext)
+		//fmt.Fprintf(os.Stderr, "\nEnd of Section: %v Acc:%v context:%v params:%v values:%v executing:%v \n\n", sec.Name, sec.acc, workingContext, sec.params, sec.values, sec.executing)
 		//return sec
 
-		if sec.params == nil && sec.executing == true {
+		if sec.params == nil { // && sec.executing == true
 			switch saveAcc := workingContext.(type) {
 			case accStorer:
 				{
@@ -285,6 +283,7 @@ func (sec *DimSectionDeclaration) DetermineResults(context interface{}) interfac
 				lookupPop.PopLookUp()
 			}
 		}
+		//fmt.Fprintf(os.Stderr, "\t+++++++++results(%v): %v\n", sec.Name, sec.acc)
 		return sec.acc
 	}
 	return sec
@@ -307,7 +306,6 @@ func (sec *DimSectionDeclaration) Compute(context interface{}) {
 	//fmt.Fprintf(os.Stderr, "\nbefore section compute: %v %v %v\n", sec.params, sec.values, context)
 	sec.DetermineResults(workingContext)
 
-	//fmt.Fprintf(os.Stderr, "\n========> after section compute: %v\n", context)
 	sec.executing = false
 
 	switch wiper := context.(type) {
@@ -316,8 +314,8 @@ func (sec *DimSectionDeclaration) Compute(context interface{}) {
 			wiper.EraseValueFromStore(sec.Name)
 		}
 	}
-
-	//fmt.Printf("after section compute %v\n", context)
+	//fmt.Fprintf(os.Stderr, "\n========> after section compute: %v %v %v\n", sec.params, sec.values, context)
+	//fmt.Printf("after section compute %v\n", sec)
 }
 
 func (sec *DimSectionDeclaration) AddToStatements(value interface{}) {
@@ -327,16 +325,17 @@ func (sec *DimSectionDeclaration) AddToStatements(value interface{}) {
 }
 
 func (sec *DimSectionDeclaration) Results() map[string]float64 {
-	//fmt.Fprintf(os.Stderr, "section results called\n")
+
 	if sec.acc != nil {
 		temp := sec.acc
 		sec.acc = nil
+		//fmt.Fprintf(os.Stderr, "section results called %v %v\n", temp, sec.acc)
 		return temp
 	}
 	return nil
 }
 
 func (sec *DimSectionDeclaration) String() string {
-	//fmt.Fprintf(os.Stderr, "\nSection(%v):\n\tstatement:%v\n\tparams:%v\n\tparams-v:%v\n", sec.Name, sec.Statements, sec.params, sec.values)
-	return fmt.Sprintf("Section(%v):%v\n", sec.Name, sec.context)
+	//fmt.Fprintf(os.Stderr, "\nSection(%v):\n\tstatement:%v\n\tparams:%v\n\tvalues:%v\n", sec.Name, sec.Statements, sec.params, sec.values)
+	return fmt.Sprintf("Section(%v):%v %p\n", sec.Name, sec.context, sec)
 }

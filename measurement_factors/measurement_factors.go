@@ -156,11 +156,44 @@ type sectionLookup interface {
 	LookUpVar(v string) interface{}
 }
 
-func DimCharacteristicAsVariable(lst interface{}, sec interface{}) interface{} {
-
-	switch d := lst.(type) {
+func DimFuncReferenceCall(name string, parameters interface{}, sec interface{}) interface{} {
+	switch top := sec.(type) {
 	case *list.List:
 		{
+			sectionTop := top.Front().Value
+			boolSetter, ok := sectionTop.(hasvarrefs)
+			if ok {
+				boolSetter.SetHasVariableReferences(true) //indicate that current section has a var
+			}
+			nf := NewDimFunctionCall(name, parameters.(*list.List), sec)
+			//fmt.Fprintf(os.Stderr, "func %v %T\n", nf, nf)
+			return nf
+		}
+	}
+	return nil
+}
+
+func DimVarReferenceCall(name string, sec interface{}) interface{} {
+	switch top := sec.(type) {
+	case *list.List:
+		{
+			sectionTop := top.Front().Value
+			boolSetter, ok := sectionTop.(hasvarrefs)
+			if ok {
+				boolSetter.SetHasVariableReferences(true) //indicate that current section has a var
+			}
+			return NewDimMeasurement(name, constants.DimReference, constants.DimVarOperand)
+		}
+	}
+	return nil
+}
+
+func DimCharacteristicAsVariable(clist interface{}, sec interface{}) interface{} {
+
+	switch d := clist.(type) {
+	case *list.List:
+		{
+			//fmt.Fprintf(os.Stderr, "%v %v", d.Front().Value, sec)
 			switch d.Len() {
 			case 1:
 				{
@@ -186,7 +219,7 @@ func DimCharacteristicAsVariable(lst interface{}, sec interface{}) interface{} {
 									if fok {
 										//if slookup.LookUpVar(fname.(string)) != nil {
 										nf := NewDimFunctionCall(fname.(string), args.(*list.List), sec)
-										fmt.Fprintf(os.Stderr, "func %v %T\n", nf, nf)
+										//fmt.Fprintf(os.Stderr, "func %v %T\n", nf, nf)
 										return nf
 										//}
 										//return nil

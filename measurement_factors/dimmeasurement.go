@@ -34,7 +34,9 @@ func NewDimMeasurement(str string, indicator int, precision int) *DimMeasurement
 }
 
 func (measurement *DimMeasurement) String() string {
-	return fmt.Sprintf("dim: value(%v) indicator(%v) precision(%v)", measurement.value, measurement.Indicator, measurement.precision)
+
+	return fmt.Sprintf("%v", measurement.value)
+	//return fmt.Sprintf("dim: value(%v) indicator(%v) precision(%v)", measurement.value, measurement.Indicator, measurement.precision)
 }
 
 /*
